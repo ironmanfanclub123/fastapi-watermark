@@ -12,7 +12,7 @@ def add_watermark(input_video_path: str, output_video_path: str, watermark_text:
     video = VideoFileClip(input_video_path)
     text_clip = TextClip(
         text=watermark_text,
-        font="C:/Windows/Fonts/arial.ttf",
+        font="Fonts/arial.ttf",
         font_size=font_size,
         color='white',
         stroke_color='black',
