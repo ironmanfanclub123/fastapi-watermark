@@ -16,7 +16,7 @@ app.mount("/videos", StaticFiles(directory=TEMP_DIR), name="videos")
 
 
 class VideoWatermarker:
-    def __init__(self, font_path: str = "Fonts/arial.ttf"):
+    def __init__(self, font_path: str = "Fonts/BunchBlossoms.ttf"):
         self.font_path = font_path
 
     def _generate_file_paths(self, suffix=".mp4"):
@@ -39,8 +39,8 @@ class VideoWatermarker:
                 ffmpeg
                 .input(str(input_path))
                 .output(str(output_path), vcodec='libx264', acodec='aac',
-                        vf=f"drawtext=text='{watermark_text}':fontcolor=white:fontsize=24:"
-                           f"x=(w-text_w)/2:y=((h-text_h)*3)/4:fontfile='{self.font_path}'",
+                        vf=f"drawtext=text='{watermark_text}':fontcolor=white:fontsize=36:"
+                           f"x=(w-text_w)/2:y=((h-text_h)*4)/5:fontfile='{self.font_path}'",
                         y=None)
                 .run()
             )
