@@ -22,6 +22,8 @@ def add_watermark_ffmpeg(input_path, output_path, watermark_text):
 
 @app.post("/upload-video/")
 async def upload_video(file: UploadFile = File(...), watermark_text: str = Form(...)):
+    print("ffmeg present ?", shutil.which("ffmpeg"))
+
     input_path = f"temp/{file.filename}"
     output_path = f"temp/output_{file.filename}"
 
