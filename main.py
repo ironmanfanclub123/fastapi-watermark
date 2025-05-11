@@ -22,7 +22,8 @@ def add_watermark(input_video_path: str, output_video_path: str, watermark_text:
         duration=video.duration,
     )
     final = CompositeVideoClip([video, text_clip])
-    final.write_videofile(output_video_path, codec="libx264", audio_codec="aac")
+    final.write_videofile(output_video_path, codec="libx264", audio_codec="aac", logger=None)
+    print("Done processing !!!")
 
 
 @app.post("/upload-video/")
