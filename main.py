@@ -1,13 +1,15 @@
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse
-import os
 import shutil
 import ffmpeg
 import requests
 from pathlib import Path
-from uuid import uuid4
+from supabase import create_client, Client
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
 app = FastAPI()
 TEMP_DIR = Path("temp")
 TEMP_DIR.mkdir(exist_ok=True)
@@ -37,12 +39,12 @@ class VideoWatermarker:
         try:
             (
                 ffmpeg
-                .input(str(input_path))
-                .output(str(output_path), vcodec='libx264', acodec='aac',
-                        vf=f"drawtext=text='{watermark_text}':fontcolor=white:fontsize=36:"
-                           f"x=(w-text_w)/2:y=((h-text_h)*4)/5:fontfile='{self.font_path}'",
-                        y=None)
-                .run()
+                    .input(str(input_path))
+                    .output(str(output_path), vcodec='libx264', acodec='aac',
+                            vf=f"drawtext=text='{watermark_text}':fontcolor=white:fontsize=36:"
+                               f"x=(w-text_w)/2:y=((h-text_h)*4)/5:fontfile='{self.font_path}'",
+                            y=None)
+                    .run()
             )
         except ffmpeg.Error as e:
             raise HTTPException(status_code=500, detail=f"FFmpeg error: {e.stderr.decode()}")
@@ -61,13 +63,51 @@ class VideoWatermarker:
         return output_path.name
 
 
+class SupabaseVideoService:
+    def __init__(self):
+        url = os.environ.get("SUPABASE_URL")
+        key = os.environ.get("SUPABASE_KEY")
+        self.supabase: Client = create_client(url, key)
+        self.table_name = os.environ.get("SUPABASE_TABLE")
+
+    def video_exists(self, permalink: str) -> bool:
+        try:
+            response = (
+                self.supabase
+                    .table(self.table_name)
+                    .select("permalink")
+                    .eq("permalink", permalink)
+                    .execute()
+            )
+            return len(response.data) > 0
+        except Exception as e:
+            print(f"[Supabase] Error checking existence: {e}")
+            return False
+
+    def insert_video(self, permalink: str) -> bool:
+        try:
+            payload = {"permalink": permalink, }
+            response = (
+                self.supabase
+                    .table(self.table_name)
+                    .insert(payload)
+                    .execute()
+            )
+
+            return bool(response.data)
+        except Exception as e:
+            print(f"[Supabase] Error inserting record: {e}")
+            return False
+
+
 watermarker = VideoWatermarker()
+supabase_service = SupabaseVideoService()
 
 
 @app.post("/upload-video/")
 async def upload_video(
-    file: UploadFile = File(...),
-    watermark_text: str = Form(...)
+        file: UploadFile = File(...),
+        watermark_text: str = Form(...)
 ):
     video_name = watermarker.process_uploaded_file(file, watermark_text)
     return {"output_video_url": f"/videos/{video_name}"}
@@ -75,11 +115,24 @@ async def upload_video(
 
 @app.post("/provide-url/")
 async def watermark_from_url(
-    video_url: str = Form(...),
-    watermark_text: str = Form(...)
+        video_url: str = Form(...),
+        watermark_text: str = Form(...),
+        permalink: str = Form(...),
+        caption: str = Form(...),
 ):
-    video_name = watermarker.process_video_from_url(video_url, watermark_text)
-    return {"output_video_url": f"/videos/{video_name}"}
+    if supabase_service.video_exists(permalink):
+        return {
+            "success": False,
+        }
+    else:
+        video_name = watermarker.process_video_from_url(video_url, watermark_text)
+        success = supabase_service.insert_video(permalink)
+        return {
+            "success": success,
+            "output_video_url": f"/videos/{video_name}",
+            "permalink": permalink,
+            "caption": caption,
+        }
 
 
 @app.get("/videos/{video_name}")
